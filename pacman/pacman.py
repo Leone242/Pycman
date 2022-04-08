@@ -1,5 +1,6 @@
 import pygame
 from abc import ABCMeta, abstractmethod
+import random
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600), 0)
@@ -10,6 +11,11 @@ azul = (0, 0, 255)
 preto = (0, 0, 0)
 vermelho = (255, 0, 0)
 branco = (255, 255, 255)
+
+acima = 1
+abaixo = 2
+direita = 3
+esquerda = 4
 
 velocidade = 1
 
@@ -28,9 +34,10 @@ class ElementoJogo(metaclass=ABCMeta):
 
 
 class Cenario(ElementoJogo):
-    def __init__(self, tamanho, pac):
+    def __init__(self, tamanho, pac, fan):
         self.tamanho = tamanho
         self.pacman = pac
+        self.fantasma = fan
         self.pontos = 0
         self.matriz = [
             [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
@@ -87,7 +94,23 @@ class Cenario(ElementoJogo):
             self.pintar_linha(tela, numero_linha, linha)
         self.exibe_pontos(tela)
 
+    def get_direcoes(self, linha, coluna):
+        direcoes = []
+        if self.matriz[int(linha -1)][int(coluna)] != 2:
+            direcoes.append(acima)
+        if self.matriz[int(linha + 1)][int(coluna)] != 2:
+            direcoes.append(abaixo)
+        if self.matriz[int(linha)][int(coluna - 1)] != 2:
+            direcoes.append(esquerda)
+        if self.matriz[int(linha)][int(coluna + 1)] != 2:
+            direcoes.append(direita)
+        return direcoes
+
     def calcular_regras(self):
+        direcoes = self.get_direcoes(self.fantasma.linha, self.fantasma.coluna)
+        if len(direcoes) >= 3:
+            self.fantasma.esquina(direcoes)
+
         col = self.pacman.coluna_intencao
         lin = self.pacman.linha_intencao
         if 0 <= col < 28 and 0 <= lin < 29:
@@ -96,6 +119,14 @@ class Cenario(ElementoJogo):
                 if self.matriz[lin][col] == 1:
                     self.pontos +=1
                     self.matriz[lin][col] = 0
+
+        col = int(self.fantasma.coluna_intencao)
+        lin = int(self.fantasma.linha_intencao)
+        if 0 <= col < 28 and 0 <= lin < 29 and self.matriz[lin][col] != 2:
+            self.fantasma.aceitar_movimento()
+        else:
+            self.fantasma.recusar_movimento(direcoes)
+
 
     def processar_eventos(self, evts):
         for e in evts:
@@ -165,12 +196,39 @@ class Fantasma(ElementoJogo):
     def __init__(self, cor, tamanho):
         self.coluna = 6
         self.linha = 8
+        self.linha_intencao = self.linha
+        self.coluna_intencao = self.coluna
+        self.velocidade = 1
+        self.direcao = 0
         self.tamanho = tamanho
         self.cor = cor
 
 
     def calcular_regras(self):
-        pass
+        if self.direcao == acima:
+            self.linha_intencao -= self.velocidade
+        elif self.direcao == abaixo:
+            self.linha_intencao += self.velocidade
+        elif self.direcao == direita:
+            self.coluna_intencao += self.velocidade
+        elif self.direcao == esquerda:
+            self.coluna_intencao -= self.velocidade
+
+    def mudar_direcao(self, direcoes):
+        self.direcao = random.choice(direcoes)
+
+    def esquina(self, direcoes):
+        self.mudar_direcao(direcoes)
+
+    def aceitar_movimento(self):
+        self.linha = self.linha_intencao
+        self.coluna = self.coluna_intencao
+
+
+    def recusar_movimento(self, direcoes):
+        self.linha_intencao = self.linha
+        self.coluna_intencao = self.coluna
+        self.mudar_direcao(direcoes)
 
     def pintar(self, tela):
         fatia = self.tamanho // 8
@@ -209,10 +267,11 @@ if __name__== '__main__':
     size = (600 // 30)
     pacman = Pacman(size)
     blinky = Fantasma(vermelho, size)
-    cenario = Cenario(size, pacman)
+    cenario = Cenario(size, pacman, blinky)
 
     while True:
         pacman.calcular_regras()
+        blinky.calcular_regras()
         cenario.calcular_regras()
 
         screen.fill(preto)
@@ -220,7 +279,7 @@ if __name__== '__main__':
         pacman.pintar(screen)
         blinky.pintar(screen)
         pygame.display.update()
-        pygame.time.delay(60)
+        pygame.time.delay(100)
 
         eventos = pygame.event.get()
 
