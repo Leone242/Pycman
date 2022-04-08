@@ -1,4 +1,5 @@
 import pygame
+from abc import ABCMeta, abstractmethod
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600), 0)
@@ -7,10 +8,26 @@ fonte = pygame.font.SysFont('arial', 24, True, False)
 amarelo = (255, 255, 0)
 azul = (0, 0, 255)
 preto = (0, 0, 0)
+vermelho = (255, 0, 0)
+branco = (255, 255, 255)
 
 velocidade = 1
 
-class Cenario:
+class ElementoJogo(metaclass=ABCMeta):
+    @abstractmethod
+    def pintar(self, tela):
+        pass
+
+    @abstractmethod
+    def calcular_regras(self):
+        pass
+
+    @abstractmethod
+    def processar_eventos(self, eventos):
+        pass
+
+
+class Cenario(ElementoJogo):
     def __init__(self, tamanho, pac):
         self.tamanho = tamanho
         self.pacman = pac
@@ -80,8 +97,13 @@ class Cenario:
                     self.pontos +=1
                     self.matriz[lin][col] = 0
 
+    def processar_eventos(self, evts):
+        for e in evts:
+            if e.type == pygame.QUIT:
+                exit()
 
-class Pacman:
+
+class Pacman(ElementoJogo):
     def __init__(self, tamanho):
         self.coluna = 1
         self.linha = 1
@@ -94,7 +116,7 @@ class Pacman:
         self.coluna_intencao = self.coluna
         self.linha_intencao = self.linha
 
-    def calcula_regras(self):
+    def calcular_regras(self):
         self.coluna_intencao = self.coluna + self.vel_x
         self.linha_intencao = self.linha + self.vel_y
         self.centro_x = (self.coluna * self.tamanho + self.raio)
@@ -139,32 +161,68 @@ class Pacman:
         self.coluna = self.coluna_intencao
         self.linha = self.linha_intencao
 
-    '''def processar_eventos_mouse(self, eventos):
-        delay = 60
-        for e in eventos:
-            if e.type == pygame.MOUSEMOTION:
-                mouse_x, mouse_y = e.pos
-                self.coluna =(mouse_x - self.centro_x) / delay
-                self.linha = (mouse_y - self.centro_y) / delay'''
+class Fantasma(ElementoJogo):
+    def __init__(self, cor, tamanho):
+        self.coluna = 6
+        self.linha = 8
+        self.tamanho = tamanho
+        self.cor = cor
+
+
+    def calcular_regras(self):
+        pass
+
+    def pintar(self, tela):
+        fatia = self.tamanho // 8
+        px = int(self.coluna * self.tamanho)
+        py = int(self.linha * self.tamanho)
+        contorno = [
+            (px, py + self.tamanho),
+            (px + fatia*2, py + fatia*2),
+            (px + fatia*3, py + fatia//2),
+            (px +fatia*4, py),
+            (px + fatia*6, py),
+            (px +fatia*7, py + fatia//2),
+            (px +fatia*7.75, py + fatia*2),
+            (px +self.tamanho, py + self.tamanho)
+        ]
+        pygame.draw.polygon(tela, self.cor, contorno, 0)
+        olho_raio_ext = fatia
+        olho_raio_int = fatia // 2
+
+        olho_e_x = int(px + fatia * 3)
+        olho_e_y = int(py + fatia * 2.5)
+
+        olho_d_x = int(px + fatia * 6)
+        olho_d_y = int(py + fatia * 2.5)
+        pygame.draw.circle(tela, branco, (olho_e_x, olho_e_y), olho_raio_ext, 0)
+        pygame.draw.circle(tela, preto, (olho_e_x, olho_e_y), olho_raio_int, 0)
+
+        pygame.draw.circle(tela, branco, (olho_d_x, olho_d_y), olho_raio_ext, 0)
+        pygame.draw.circle(tela, preto, (olho_d_x, olho_d_y), olho_raio_int, 0)
+
+    def processar_eventos(self, evts):
+        pass
 
 
 if __name__== '__main__':
     size = (600 // 30)
     pacman = Pacman(size)
+    blinky = Fantasma(vermelho, size)
     cenario = Cenario(size, pacman)
 
     while True:
-        pacman.calcula_regras()
+        pacman.calcular_regras()
         cenario.calcular_regras()
 
         screen.fill(preto)
         cenario.pintar(screen)
         pacman.pintar(screen)
+        blinky.pintar(screen)
         pygame.display.update()
         pygame.time.delay(60)
 
         eventos = pygame.event.get()
-        for e in eventos:
-            if e.type == pygame.QUIT:
-                exit()
+
         pacman.processar_eventos(eventos)
+        cenario.processar_eventos(eventos)
